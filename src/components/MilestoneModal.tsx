@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Milestone, GoalPlan } from '../types';
+import { Milestone, GoalPlan, MilestoneStageType } from '../types';
 import { X, Calendar, Flag, ShieldCheck } from 'lucide-react';
 import { addDaysToDate, formatJapaneseDate } from '../utils/dateUtils';
 
@@ -21,6 +21,7 @@ export const MilestoneModal: React.FC<MilestoneModalProps> = ({
   const [day, setDay] = useState(7);
   const [title, setTitle] = useState('');
   const [targetDescription, setTargetDescription] = useState('');
+  const [stageType, setStageType] = useState<MilestoneStageType>('practice');
   const [checkQuestion, setCheckQuestion] = useState('');
   const [recoveryTip, setRecoveryTip] = useState('');
   const [isBufferStage, setIsBufferStage] = useState(false);
@@ -31,6 +32,7 @@ export const MilestoneModal: React.FC<MilestoneModalProps> = ({
       setDay(milestoneToEdit.day);
       setTitle(milestoneToEdit.title);
       setTargetDescription(milestoneToEdit.targetDescription);
+      setStageType(milestoneToEdit.stageType || (milestoneToEdit.isBufferStage ? 'buffer' : 'practice'));
       setCheckQuestion(milestoneToEdit.checkQuestion);
       setRecoveryTip(milestoneToEdit.recoveryTip);
       setIsBufferStage(!!milestoneToEdit.isBufferStage);
@@ -42,6 +44,7 @@ export const MilestoneModal: React.FC<MilestoneModalProps> = ({
       setDay(Math.min(plan.totalDays, Math.round(plan.totalDays / 2)));
       setTitle('');
       setTargetDescription('');
+      setStageType('practice');
       setCheckQuestion('ここまで予定通り進められていますか？');
       setRecoveryTip('少し遅れていても、重要度の高いものに絞れば大丈夫です。');
       setIsBufferStage(false);
@@ -74,10 +77,11 @@ export const MilestoneModal: React.FC<MilestoneModalProps> = ({
       percentage,
       title: title.trim(),
       targetDescription: targetDescription.trim(),
+      stageType,
       checkQuestion: checkQuestion.trim() || 'ここまで予定通り進められていますか？',
       recoveryTip:
         recoveryTip.trim() || '少し遅れていても、無理せずペースを取り戻しましょう。',
-      isBufferStage,
+      isBufferStage: stageType === 'buffer' || isBufferStage,
       checklistItems:
         checklistItems.length > 0
           ? checklistItems
@@ -144,6 +148,39 @@ export const MilestoneModal: React.FC<MilestoneModalProps> = ({
               placeholder="例: 第1章の読破と基本用語の整理"
               className="w-full text-xs px-3 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-stone-900 focus:outline-none focus:border-amber-500"
             />
+          </div>
+
+          {/* Stage Type Selection */}
+          <div>
+            <label className="block text-xs font-bold text-stone-800 mb-1.5">
+              チェックポイントの段階・役割
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+              {[
+                { type: 'setup' as const, label: '🌱 立ち上げ', desc: '準備・基礎' },
+                { type: 'practice' as const, label: '⚡ 実践・コア', desc: '山場・進行' },
+                { type: 'refine' as const, label: '🔍 調整・検証', desc: '洗練・見直し' },
+                { type: 'buffer' as const, label: '🛡️ バッファ', desc: '予備・挽回' },
+                { type: 'finish' as const, label: '🏁 完成・ゴール', desc: '総仕上げ' },
+              ].map((item) => (
+                <button
+                  key={item.type}
+                  type="button"
+                  onClick={() => {
+                    setStageType(item.type);
+                    if (item.type === 'buffer') setIsBufferStage(true);
+                  }}
+                  className={`p-2 rounded-xl text-left border transition cursor-pointer flex flex-col ${
+                    stageType === item.type
+                      ? 'border-amber-500 bg-amber-50/80 text-amber-950 font-bold ring-1 ring-amber-400'
+                      : 'border-stone-200 bg-stone-50/70 hover:bg-stone-100/70 text-stone-700'
+                  }`}
+                >
+                  <span className="text-xs font-bold leading-tight">{item.label}</span>
+                  <span className="text-[10px] text-stone-500 mt-0.5">{item.desc}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Target Description */}

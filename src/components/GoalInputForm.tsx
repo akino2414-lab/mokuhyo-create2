@@ -10,8 +10,13 @@ import {
   ArrowRight,
   HelpCircle,
   Loader2,
+  BookOpen,
+  Laptop,
+  Activity,
+  Home,
+  Layers,
 } from 'lucide-react';
-import { PacingStyle } from '../types';
+import { PacingStyle, GoalCategory } from '../types';
 import { getTodayString } from '../utils/dateUtils';
 
 interface GoalInputFormProps {
@@ -19,6 +24,7 @@ interface GoalInputFormProps {
     goal: string;
     totalDays: number;
     startDate: string;
+    category: GoalCategory;
     currentStatus: string;
     dailyTime: string;
     pacingStyle: PacingStyle;
@@ -26,6 +32,44 @@ interface GoalInputFormProps {
   }) => Promise<void>;
   isLoading: boolean;
 }
+
+const CATEGORY_OPTIONS: {
+  id: GoalCategory;
+  label: string;
+  sub: string;
+  icon: any;
+}[] = [
+  {
+    id: 'study',
+    label: '勉強・資格・読書',
+    sub: '章ごとの進捗・過去問・暗記定着',
+    icon: BookOpen,
+  },
+  {
+    id: 'project',
+    label: '制作・開発・仕事',
+    sub: 'プロトタイプ・コア機能・公開',
+    icon: Laptop,
+  },
+  {
+    id: 'habit',
+    label: '習慣・運動・健康',
+    sub: '最小ハードル・日課定着・休息調整',
+    icon: Activity,
+  },
+  {
+    id: 'life',
+    label: '生活・片付け・整理',
+    sub: 'エリア別仕分け・不用品処分・新定置',
+    icon: Home,
+  },
+  {
+    id: 'general',
+    label: 'その他・自由目標',
+    sub: '目標文脈に沿って柔軟に設計',
+    icon: Layers,
+  },
+];
 
 const PACING_OPTIONS: {
   id: PacingStyle;
@@ -64,13 +108,32 @@ const PACING_OPTIONS: {
   },
 ];
 
-const SUGGESTIONS = [
-  '30日で資格試験テキスト（全10章）を1周終わらせる',
-  '14日でポートフォリオWebサイトを公開する',
-  '21日で部屋の片付け＆メルカリ断捨離を完了する',
-  '10日で本を3冊読んでアウトプットをまとめる',
-  '30日で体重マイナス2kg＆運動習慣をつける',
-];
+const SUGGESTIONS_BY_CATEGORY: Record<GoalCategory, string[]> = {
+  study: [
+    '30日で資格試験テキスト（全10章）を1周終わらせる',
+    '10日で積ん読本3冊を読破してメモをまとめる',
+    '60日でTOEIC単語帳1000語と公式問題集2回分を解く',
+  ],
+  project: [
+    '14日でポートフォリオWebサイトを公開する',
+    '21日でYouTube動画を3本編集して投稿する',
+    '30日で個人開発のWebアプリMVPをリリースする',
+  ],
+  habit: [
+    '30日で体重マイナス2kg＆軽い筋トレ習慣をつける',
+    '21日で朝6時起きのルーティンを定着させる',
+    '14日で毎日15分のストレッチ・ウォーキングを継続する',
+  ],
+  life: [
+    '21日で部屋全体の断捨離＆片付けを完了する',
+    '14日で押し入れ・クローゼットを整理して不用品を売る',
+    '7日でキッチンの棚と冷蔵庫の中を総点検・清掃する',
+  ],
+  general: [
+    '30日でやりたいことリスト10個を実行する',
+    '14日で新しい趣味の基礎を体験してまとめる',
+  ],
+};
 
 export const GoalInputForm: React.FC<GoalInputFormProps> = ({
   onSubmit,
@@ -79,6 +142,7 @@ export const GoalInputForm: React.FC<GoalInputFormProps> = ({
   const [goal, setGoal] = useState('');
   const [totalDays, setTotalDays] = useState(30);
   const [startDate, setStartDate] = useState(getTodayString());
+  const [category, setCategory] = useState<GoalCategory>('study');
   const [currentStatus, setCurrentStatus] = useState('未着手（ゼロからスタート）');
   const [dailyTime, setDailyTime] = useState('平日30〜45分、休日1〜2時間');
   const [pacingStyle, setPacingStyle] = useState<PacingStyle>('front_loaded');
@@ -93,6 +157,7 @@ export const GoalInputForm: React.FC<GoalInputFormProps> = ({
       goal: goal.trim(),
       totalDays: Number(totalDays),
       startDate,
+      category,
       currentStatus,
       dailyTime,
       pacingStyle,
@@ -104,6 +169,8 @@ export const GoalInputForm: React.FC<GoalInputFormProps> = ({
     setTotalDays(days);
   };
 
+  const currentSuggestions = SUGGESTIONS_BY_CATEGORY[category] || SUGGESTIONS_BY_CATEGORY.study;
+
   return (
     <div className="bg-white rounded-2xl border border-stone-200/90 shadow-sm p-5 sm:p-7 transition">
       <div className="mb-6">
@@ -114,11 +181,48 @@ export const GoalInputForm: React.FC<GoalInputFormProps> = ({
           </h2>
         </div>
         <p className="text-sm text-stone-600">
-          「何日でここまでやりたいか」を教えてください。実現可能な中間チェックポイント（マイルストーン）を自動設計します。
+          「何日でここまでやりたいか」を教えてください。目標の種類や性質に合わせた最適チェックポイントを設計します。
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Goal Category Selector */}
+        <div>
+          <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
+            目標のジャンル・性質（チェックポイントの内容が変わります）
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {CATEGORY_OPTIONS.map((cat) => {
+              const Icon = cat.icon;
+              const isSelected = category === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setCategory(cat.id)}
+                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-amber-50 border-amber-500 ring-1 ring-amber-500 text-stone-900'
+                      : 'bg-stone-50/70 border-stone-200 hover:bg-stone-100 text-stone-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Icon
+                      className={`w-4 h-4 ${
+                        isSelected ? 'text-amber-600' : 'text-stone-400'
+                      }`}
+                    />
+                    <span className="text-xs font-bold truncate">{cat.label}</span>
+                  </div>
+                  <span className="text-[10px] text-stone-500 leading-tight line-clamp-1">
+                    {cat.sub}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Goal Input */}
         <div>
           <label
@@ -133,14 +237,24 @@ export const GoalInputForm: React.FC<GoalInputFormProps> = ({
             required
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
-            placeholder="例: 簿記3級のテキストを1冊終わらせる、Reactのアプリを完成させる など"
+            placeholder={
+              category === 'study'
+                ? '例: 簿記3級のテキストを1周終わらせる、TOEIC単語帳を暗記する'
+                : category === 'project'
+                ? '例: ポートフォリオWebサイトを公開する、YouTube動画を3本投稿する'
+                : category === 'habit'
+                ? '例: 体重マイナス2kg＆筋トレ習慣化、毎日早起きして散歩する'
+                : category === 'life'
+                ? '例: 21日で部屋の断捨離＆片付けを完了する、服のメルカリ出品'
+                : '例: 30日で新しいスキルを身につけて形にする'
+            }
             className="w-full px-4 py-3 text-stone-900 bg-stone-50 border border-stone-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm transition"
           />
 
           {/* Quick Suggestion Chips */}
           <div className="mt-2.5 flex flex-wrap gap-1.5">
-            <span className="text-xs text-stone-400 self-center mr-1">例:</span>
-            {SUGGESTIONS.map((item, idx) => (
+            <span className="text-xs text-stone-400 self-center mr-1">おすすめ例:</span>
+            {currentSuggestions.map((item, idx) => (
               <button
                 key={idx}
                 type="button"

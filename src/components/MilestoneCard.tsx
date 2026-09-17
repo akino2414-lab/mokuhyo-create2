@@ -28,6 +28,7 @@ interface MilestoneCardProps {
   onUpdateNotes: (milestoneId: string, notes: string) => void;
   onEditMilestone: (milestone: Milestone) => void;
   onDeleteMilestone: (milestoneId: string) => void;
+  onCelebrate?: (milestone: Milestone) => void;
   isSelected?: boolean;
 }
 
@@ -42,6 +43,7 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
   onUpdateNotes,
   onEditMilestone,
   onDeleteMilestone,
+  onCelebrate,
   isSelected,
 }) => {
   const [newChecklistText, setNewChecklistText] = useState('');
@@ -129,7 +131,29 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
                 進捗目安: 約{milestone.percentage}%
               </span>
 
-              {isBuffer && (
+              {milestone.stageType && (
+                <span
+                  className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
+                    milestone.stageType === 'setup'
+                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60'
+                      : milestone.stageType === 'practice'
+                      ? 'bg-orange-50 text-orange-700 border border-orange-200/60'
+                      : milestone.stageType === 'refine'
+                      ? 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                      : milestone.stageType === 'buffer'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                  }`}
+                >
+                  {milestone.stageType === 'setup' && '🌱 立ち上げ・導入'}
+                  {milestone.stageType === 'practice' && '⚡ コア実践・制作'}
+                  {milestone.stageType === 'refine' && '🎯 演習・ブラッシュアップ'}
+                  {milestone.stageType === 'buffer' && '🛡️ バッファ・総復習'}
+                  {milestone.stageType === 'finish' && '🏆 完走・最終完了'}
+                </span>
+              )}
+
+              {isBuffer && !milestone.stageType && (
                 <span className="text-xs font-medium text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3 text-blue-600" />
                   予備・調整期間
@@ -161,6 +185,18 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
 
         {/* Action icons */}
         <div className="flex items-center gap-1.5 ml-auto">
+          {isCompleted && onCelebrate && (
+            <button
+              type="button"
+              onClick={() => onCelebrate(milestone)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition cursor-pointer shadow-2xs"
+              title="達成メッセージ・褒め言葉を見る"
+            >
+              <Sparkles className="w-3 h-3 text-amber-600" />
+              <span>褒め言葉</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onEditMilestone(milestone)}

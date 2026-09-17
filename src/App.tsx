@@ -7,7 +7,12 @@ import { TodayWidget } from './components/TodayWidget';
 import { PlanHeader } from './components/PlanHeader';
 import { MilestoneModal } from './components/MilestoneModal';
 import { PresetsModal } from './components/PresetsModal';
-import { GoalPlan, Milestone, PresetGoal } from './types';
+import { CalendarView } from './components/CalendarView';
+import { DashboardMultiView } from './components/DashboardMultiView';
+import { ViewModeTabs } from './components/ViewModeTabs';
+import { CelebrationModal } from './components/CelebrationModal';
+import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { GoalPlan, Milestone, PresetGoal, AppViewMode, GoalCategory } from './types';
 import { getTodayString } from './utils/dateUtils';
 import { Plus, Sparkles, ListChecks } from 'lucide-react';
 
@@ -19,6 +24,7 @@ const DEFAULT_SAMPLE_PLAN: GoalPlan = {
   createdAt: new Date().toISOString(),
   startDate: getTodayString(),
   totalDays: 30,
+  category: 'study',
   currentStatus: 'テキストは購入したがまだ1ページも開いていない',
   dailyTime: '平日45分、休日1.5時間',
   pacingStyle: 'front_loaded',
@@ -36,6 +42,7 @@ const DEFAULT_SAMPLE_PLAN: GoalPlan = {
       day: 5,
       percentage: 20,
       title: '第1〜2章の通読 ＆ 全体像の把握',
+      stageType: 'setup',
       targetDescription:
         'テキスト全体の目次を眺めて「どんな山があるか」を把握し、第2章までの基本用語に慣れておく。暗記は不要で「ふーん、こういう話か」と掴めればOK。',
       checklistItems: [
@@ -53,6 +60,7 @@ const DEFAULT_SAMPLE_PLAN: GoalPlan = {
       day: 12,
       percentage: 50,
       title: '第3〜5章完了（前半の山場・折り返し地点）',
+      stageType: 'practice',
       targetDescription:
         '最も重要でボリュームのある第3〜5章を通過する。練習問題は解けなくても解答をすぐ見て「解き方の流れ」を理解していれば充分合格ラインです。',
       checklistItems: [
@@ -70,6 +78,7 @@ const DEFAULT_SAMPLE_PLAN: GoalPlan = {
       day: 20,
       percentage: 80,
       title: '第6〜9章読破 ＆ メインパート完了',
+      stageType: 'refine',
       targetDescription:
         '全体の約8割を終了！後半の応用パートを粗削りでも一通り目を通し終えている状態。これで「ゴールが見えた！」という心理的余裕が生まれます。',
       checklistItems: [
@@ -87,6 +96,7 @@ const DEFAULT_SAMPLE_PLAN: GoalPlan = {
       day: 26,
       percentage: 95,
       title: '安全バッファ期間 ＆ 第10章＋弱点付箋の消化',
+      stageType: 'buffer',
       targetDescription:
         'これまでの遅れを取り戻すための専用予備期間。急な残業や体調不良があってもここで吸収可能。最終章の確認と付箋を貼った箇所の見直しを行います。',
       checklistItems: [
@@ -105,6 +115,7 @@ const DEFAULT_SAMPLE_PLAN: GoalPlan = {
       day: 30,
       percentage: 100,
       title: 'テキスト1周完走 ＆ 総仕上げ！',
+      stageType: 'finish',
       targetDescription:
         '全10章を完走！テキストを最初から最後までやり遂げた達成感を味わい、次の過去問演習や試験本番に向けた準備を整えるゴール地点です。',
       checklistItems: [
@@ -143,9 +154,20 @@ export default function App() {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | undefined>();
+  const [viewMode, setViewMode] = useState<AppViewMode>('plan');
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
   const [milestoneToEdit, setMilestoneToEdit] = useState<Milestone | null>(null);
   const [isPresetsModalOpen, setIsPresetsModalOpen] = useState(false);
+  const [celebrationState, setCelebrationState] = useState<{
+    isOpen: boolean;
+    plan: GoalPlan;
+    completedMilestone?: Milestone | null;
+    isEntireGoalCompleted?: boolean;
+  } | null>(null);
+
+  // Plan deletion state (for custom in-app confirmation modal)
+  const [planToDelete, setPlanToDelete] = useState<GoalPlan | null>(null);
+  const [milestoneToDelete, setMilestoneToDelete] = useState<Milestone | null>(null);
 
   // Save to localStorage whenever plans change
   useEffect(() => {
@@ -163,6 +185,7 @@ export default function App() {
     goal: string;
     totalDays: number;
     startDate: string;
+    category?: GoalCategory;
     currentStatus: string;
     dailyTime: string;
     pacingStyle: any;
@@ -191,6 +214,7 @@ export default function App() {
           percentage: m.percentage || Math.round(((idx + 1) / generated.milestones.length) * 100),
           title: m.title,
           targetDescription: m.targetDescription,
+          stageType: m.stageType,
           checklistItems: (m.checklistItems || []).map((text: string, cIdx: number) => ({
             id: `chk-${Date.now()}-${idx}-${cIdx}`,
             text,
@@ -209,6 +233,7 @@ export default function App() {
         createdAt: new Date().toISOString(),
         startDate: formData.startDate,
         totalDays: formData.totalDays,
+        category: formData.category || 'general',
         currentStatus: formData.currentStatus,
         dailyTime: formData.dailyTime,
         pacingStyle: formData.pacingStyle,
@@ -233,6 +258,7 @@ export default function App() {
           day: Math.max(1, Math.round(formData.totalDays * 0.2)),
           percentage: 25,
           title: '初動の立ち上げ＆基礎固め',
+          stageType: 'setup',
           targetDescription: `全体の概要や目次を確認し、必要な教材・ツールの準備を完了する。「${formData.goal}」の最初の1/4に着手する。`,
           checklistItems: [
             { id: `c-${Date.now()}-1`, text: '必要な準備と道具を揃える', completed: false },
@@ -247,6 +273,7 @@ export default function App() {
           day: Math.max(2, Math.round(formData.totalDays * 0.5)),
           percentage: 50,
           title: '折り返し地点（コア部分の完成）',
+          stageType: 'practice',
           targetDescription: '作業の山場となる中核部分を進め、全体の半分を通過する。細かい完成度より前に進むことを優先。',
           checklistItems: [
             { id: `c-${Date.now()}-3`, text: '主要タスクの半分を消化', completed: false },
@@ -261,6 +288,7 @@ export default function App() {
           day: Math.max(3, Math.round(formData.totalDays * 0.85)),
           percentage: 85,
           title: '全体の8割完成＆バッファ調整',
+          stageType: 'buffer',
           targetDescription: '大部分の主要作業を終え、遅れを取り戻すための予備期間を確保しながら最終仕上げを行う。',
           checklistItems: [
             { id: `c-${Date.now()}-5`, text: '残った課題の絞り込み', completed: false },
@@ -276,6 +304,7 @@ export default function App() {
           day: formData.totalDays,
           percentage: 100,
           title: '目標達成＆フィニッシュ！',
+          stageType: 'finish',
           targetDescription: `「${formData.goal}」の完了！成果を振り返り、これまでの努力を讃えましょう。`,
           checklistItems: [
             { id: `c-${Date.now()}-7`, text: '最終完了の確認', completed: false },
@@ -293,6 +322,7 @@ export default function App() {
         createdAt: new Date().toISOString(),
         startDate: formData.startDate,
         totalDays: formData.totalDays,
+        category: formData.category || 'general',
         currentStatus: formData.currentStatus,
         dailyTime: formData.dailyTime,
         pacingStyle: formData.pacingStyle,
@@ -313,6 +343,8 @@ export default function App() {
   // Milestone actions
   const handleToggleChecklistItem = (milestoneId: string, itemId: string) => {
     if (!activePlan) return;
+    let newlyCompletedMilestone: Milestone | null = null;
+
     const updatedMilestones = activePlan.milestones.map((m) => {
       if (m.id !== milestoneId) return m;
       const updatedChecklist = m.checklistItems.map((item) =>
@@ -320,14 +352,32 @@ export default function App() {
       );
       // Auto-update status if all items checked
       const allChecked = updatedChecklist.length > 0 && updatedChecklist.every((c) => c.completed);
+      const newStatus = allChecked ? ('completed' as const) : m.status === 'completed' ? ('in_progress' as const) : m.status;
+
+      if (allChecked && m.status !== 'completed') {
+        newlyCompletedMilestone = { ...m, status: 'completed', checklistItems: updatedChecklist };
+      }
+
       return {
         ...m,
         checklistItems: updatedChecklist,
-        status: allChecked ? ('completed' as const) : m.status === 'completed' ? ('in_progress' as const) : m.status,
+        status: newStatus,
+        completedAt: newStatus === 'completed' ? m.completedAt || new Date().toISOString() : undefined,
       };
     });
 
     updateActivePlanMilestones(updatedMilestones);
+
+    // If milestone was newly completed, trigger praise celebration!
+    if (newlyCompletedMilestone) {
+      const willAllBeCompleted = updatedMilestones.every((m) => m.status === 'completed');
+      setCelebrationState({
+        isOpen: true,
+        plan: { ...activePlan, milestones: updatedMilestones },
+        completedMilestone: newlyCompletedMilestone,
+        isEntireGoalCompleted: willAllBeCompleted,
+      });
+    }
   };
 
   const handleAddChecklistItem = (milestoneId: string, text: string) => {
@@ -347,6 +397,9 @@ export default function App() {
 
   const handleUpdateStatus = (milestoneId: string, status: Milestone['status']) => {
     if (!activePlan) return;
+    const target = activePlan.milestones.find((m) => m.id === milestoneId);
+    const wasNotCompleted = target && target.status !== 'completed';
+
     const updatedMilestones = activePlan.milestones.map((m) => {
       if (m.id !== milestoneId) return m;
       // If marking completed, also check all checklist items
@@ -361,7 +414,40 @@ export default function App() {
         completedAt: status === 'completed' ? new Date().toISOString() : undefined,
       };
     });
+
     updateActivePlanMilestones(updatedMilestones);
+
+    // If newly marked completed, show celebration & praise!
+    if (status === 'completed' && wasNotCompleted && target) {
+      const willAllBeCompleted = updatedMilestones.every((m) => m.status === 'completed');
+      setCelebrationState({
+        isOpen: true,
+        plan: { ...activePlan, milestones: updatedMilestones },
+        completedMilestone: target,
+        isEntireGoalCompleted: willAllBeCompleted,
+      });
+    }
+  };
+
+  const handleTriggerMilestonePraise = (milestone: Milestone) => {
+    if (!activePlan) return;
+    setCelebrationState({
+      isOpen: true,
+      plan: activePlan,
+      completedMilestone: milestone,
+      isEntireGoalCompleted: false,
+    });
+  };
+
+  const handleTriggerGoalPraise = (planToCelebrate?: GoalPlan) => {
+    const target = planToCelebrate || activePlan;
+    if (!target) return;
+    setCelebrationState({
+      isOpen: true,
+      plan: target,
+      completedMilestone: null,
+      isEntireGoalCompleted: true,
+    });
   };
 
   const handleUpdateNotes = (milestoneId: string, notes: string) => {
@@ -372,15 +458,20 @@ export default function App() {
     updateActivePlanMilestones(updatedMilestones);
   };
 
-  const handleDeleteMilestone = (milestoneId: string) => {
+  const handleRequestDeleteMilestone = (milestoneId: string) => {
     if (!activePlan) return;
-    if (activePlan.milestones.length <= 1) {
-      alert('マイルストーンは最低1つ必要です。');
-      return;
-    }
-    if (!window.confirm('この中間目標を削除してもよろしいですか？')) return;
-    const updatedMilestones = activePlan.milestones.filter((m) => m.id !== milestoneId);
+    const target = activePlan.milestones.find((m) => m.id === milestoneId);
+    if (!target) return;
+    setMilestoneToDelete(target);
+  };
+
+  const handleConfirmDeleteMilestone = () => {
+    if (!activePlan || !milestoneToDelete) return;
+    const updatedMilestones = activePlan.milestones.filter(
+      (m) => m.id !== milestoneToDelete.id
+    );
     updateActivePlanMilestones(updatedMilestones);
+    setMilestoneToDelete(null);
   };
 
   const handleSaveMilestoneModal = (data: Partial<Milestone>) => {
@@ -425,18 +516,28 @@ export default function App() {
     );
   };
 
-  const handleDeletePlan = () => {
-    if (!activePlan) return;
-    if (!window.confirm(`「${activePlan.title}」を削除してもよろしいですか？`)) {
-      return;
-    }
-    const filtered = savedPlans.filter((p) => p.id !== activePlan.id);
+  const handleRequestDeletePlan = (planId?: string) => {
+    const target = planId
+      ? savedPlans.find((p) => p.id === planId)
+      : activePlan;
+    if (!target) return;
+    setPlanToDelete(target);
+  };
+
+  const handleConfirmDeletePlan = () => {
+    if (!planToDelete) return;
+    const deletedId = planToDelete.id;
+    const filtered = savedPlans.filter((p) => p.id !== deletedId);
     setSavedPlans(filtered);
-    if (filtered.length > 0) {
-      setActivePlanId(filtered[0].id);
-    } else {
-      setActivePlanId(null);
-      setIsCreatingNew(true);
+    setPlanToDelete(null);
+
+    if (activePlanId === deletedId) {
+      if (filtered.length > 0) {
+        setActivePlanId(filtered[0].id);
+      } else {
+        setActivePlanId(null);
+        setIsCreatingNew(true);
+      }
     }
   };
 
@@ -459,6 +560,7 @@ export default function App() {
         onSelectPlan={(id) => {
           setActivePlanId(id);
           setIsCreatingNew(false);
+          setViewMode('plan');
         }}
       />
 
@@ -494,90 +596,129 @@ export default function App() {
             />
           </div>
         ) : (
-          /* Active Plan Dashboard View */
-          <div className="space-y-6">
-            {/* Plan Header */}
-            <PlanHeader
-              plan={activePlan}
-              onAddMilestone={() => {
-                setMilestoneToEdit(null);
-                setIsMilestoneModalOpen(true);
-              }}
-              onDeletePlan={handleDeletePlan}
-              onNewGoal={() => setIsCreatingNew(true)}
-              onReBreakdown={() => setIsCreatingNew(true)}
+          /* View Mode Container */
+          <div className="space-y-5">
+            {/* View Mode Switching Tabs (目標プラン / カレンダー / 複数目標ダッシュボード) */}
+            <ViewModeTabs
+              currentView={viewMode}
+              onViewChange={setViewMode}
+              savedPlansCount={savedPlans.length}
             />
 
-            {/* Today's Benchmark Widget */}
-            <TodayWidget
-              plan={activePlan}
-              onFocusMilestone={handleFocusMilestone}
-            />
-
-            {/* Visual Timeline Bar */}
-            <MilestoneTimeline
-              plan={activePlan}
-              onSelectMilestone={handleFocusMilestone}
-              selectedMilestoneId={selectedMilestoneId}
-            />
-
-            {/* Intermediate Milestones Cards List */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ListChecks className="w-5 h-5 text-amber-600" />
-                  <h3 className="text-lg font-bold text-stone-900 tracking-tight">
-                    中間チェックポイント一覧（全 {activePlan.milestones.length} 段階）
-                  </h3>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
+            {viewMode === 'dashboard' ? (
+              /* Multi-Goal Dashboard View */
+              <DashboardMultiView
+                savedPlans={savedPlans}
+                activePlanId={activePlanId}
+                onSelectPlan={(id) => {
+                  setActivePlanId(id);
+                  setViewMode('plan');
+                }}
+                onNewGoal={() => setIsCreatingNew(true)}
+                onOpenPresets={() => setIsPresetsModalOpen(true)}
+                onCelebrateGoal={(planToCelebrate) => handleTriggerGoalPraise(planToCelebrate)}
+                onDeletePlan={(id) => handleRequestDeletePlan(id)}
+              />
+            ) : viewMode === 'calendar' ? (
+              /* Calendar Format View */
+              <CalendarView
+                savedPlans={savedPlans}
+                activePlanId={activePlanId}
+                onSelectPlan={(id) => setActivePlanId(id)}
+                onSelectMilestone={(mId) => {
+                  setViewMode('plan');
+                  handleFocusMilestone(mId);
+                }}
+              />
+            ) : (
+              /* Standard Goal Plan Base View */
+              <div className="space-y-6">
+                {/* Plan Header */}
+                <PlanHeader
+                  plan={activePlan}
+                  onAddMilestone={() => {
                     setMilestoneToEdit(null);
                     setIsMilestoneModalOpen(true);
                   }}
-                  className="text-xs font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/70 px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>中間目標を追加</span>
-                </button>
-              </div>
+                  onDeletePlan={() => handleRequestDeletePlan()}
+                  onNewGoal={() => setIsCreatingNew(true)}
+                  onReBreakdown={() => setIsCreatingNew(true)}
+                  onCelebrate={() => handleTriggerGoalPraise(activePlan)}
+                />
 
-              <div className="space-y-4">
-                {activePlan.milestones.map((milestone, idx) => (
-                  <MilestoneCard
-                    key={milestone.id}
-                    milestone={milestone}
-                    index={idx}
-                    plan={activePlan}
-                    currentDay={
-                      Math.max(
-                        1,
-                        Math.min(
-                          activePlan.totalDays,
-                          Math.floor(
-                            (new Date().getTime() -
-                              new Date(activePlan.startDate).getTime()) /
-                              (1000 * 60 * 60 * 24)
-                          ) + 1
-                        )
-                      )
-                    }
-                    onToggleChecklistItem={handleToggleChecklistItem}
-                    onAddChecklistItem={handleAddChecklistItem}
-                    onUpdateStatus={handleUpdateStatus}
-                    onUpdateNotes={handleUpdateNotes}
-                    onEditMilestone={(m) => {
-                      setMilestoneToEdit(m);
-                      setIsMilestoneModalOpen(true);
-                    }}
-                    onDeleteMilestone={handleDeleteMilestone}
-                    isSelected={selectedMilestoneId === milestone.id}
-                  />
-                ))}
+                {/* Today's Benchmark Widget */}
+                <TodayWidget
+                  plan={activePlan}
+                  onFocusMilestone={handleFocusMilestone}
+                />
+
+                {/* Visual Timeline Bar */}
+                <MilestoneTimeline
+                  plan={activePlan}
+                  onSelectMilestone={handleFocusMilestone}
+                  selectedMilestoneId={selectedMilestoneId}
+                />
+
+                {/* Intermediate Milestones Cards List */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ListChecks className="w-5 h-5 text-amber-600" />
+                      <h3 className="text-lg font-bold text-stone-900 tracking-tight">
+                        中間チェックポイント一覧（全 {activePlan.milestones.length} 段階）
+                      </h3>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMilestoneToEdit(null);
+                        setIsMilestoneModalOpen(true);
+                      }}
+                      className="text-xs font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/70 px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>中間目標を追加</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {activePlan.milestones.map((milestone, idx) => (
+                      <MilestoneCard
+                        key={milestone.id}
+                        milestone={milestone}
+                        index={idx}
+                        plan={activePlan}
+                        currentDay={
+                          Math.max(
+                            1,
+                            Math.min(
+                              activePlan.totalDays,
+                              Math.floor(
+                                (new Date().getTime() -
+                                  new Date(activePlan.startDate).getTime()) /
+                                  (1000 * 60 * 60 * 24)
+                              ) + 1
+                            )
+                          )
+                        }
+                        onToggleChecklistItem={handleToggleChecklistItem}
+                        onAddChecklistItem={handleAddChecklistItem}
+                        onUpdateStatus={handleUpdateStatus}
+                        onUpdateNotes={handleUpdateNotes}
+                        onEditMilestone={(m) => {
+                          setMilestoneToEdit(m);
+                          setIsMilestoneModalOpen(true);
+                        }}
+                        onDeleteMilestone={handleRequestDeleteMilestone}
+                        onCelebrate={handleTriggerMilestonePraise}
+                        isSelected={selectedMilestoneId === milestone.id}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </main>
@@ -591,6 +732,17 @@ export default function App() {
           </span>
         </div>
       </footer>
+
+      {/* Celebration & Praise Modal */}
+      {celebrationState && (
+        <CelebrationModal
+          isOpen={celebrationState.isOpen}
+          onClose={() => setCelebrationState(null)}
+          plan={celebrationState.plan}
+          completedMilestone={celebrationState.completedMilestone}
+          isEntireGoalCompleted={celebrationState.isEntireGoalCompleted}
+        />
+      )}
 
       {/* Modals */}
       {activePlan && (
@@ -611,6 +763,7 @@ export default function App() {
             goal: preset.title,
             totalDays: preset.days,
             startDate: getTodayString(),
+            category: preset.goalCategory || 'general',
             currentStatus: preset.status,
             dailyTime: preset.dailyTime,
             pacingStyle: preset.pacingStyle,
@@ -618,6 +771,30 @@ export default function App() {
           });
         }}
       />
+
+      {/* Delete Confirmation Modal for Plan */}
+      {planToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!planToDelete}
+          onClose={() => setPlanToDelete(null)}
+          onConfirm={handleConfirmDeletePlan}
+          title="この目標計画を削除しますか？"
+          description={`「${planToDelete.title}」および設定されたすべての中間チェックポイントと記録が削除されます。この操作は元に戻せません。`}
+          confirmLabel="計画を削除する"
+        />
+      )}
+
+      {/* Delete Confirmation Modal for Milestone */}
+      {milestoneToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!milestoneToDelete}
+          onClose={() => setMilestoneToDelete(null)}
+          onConfirm={handleConfirmDeleteMilestone}
+          title="この中間目標を削除しますか？"
+          description={`Day ${milestoneToDelete.day} の「${milestoneToDelete.title}」を削除します。この操作は元に戻せません。`}
+          confirmLabel="中間目標を削除"
+        />
+      )}
     </div>
   );
 }

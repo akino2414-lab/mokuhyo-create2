@@ -21,6 +21,7 @@ interface PlanHeaderProps {
   onNewGoal: () => void;
   onReBreakdown: () => void;
   isReBreakdownLoading?: boolean;
+  onCelebrate?: () => void;
 }
 
 export const PlanHeader: React.FC<PlanHeaderProps> = ({
@@ -30,12 +31,15 @@ export const PlanHeader: React.FC<PlanHeaderProps> = ({
   onNewGoal,
   onReBreakdown,
   isReBreakdownLoading,
+  onCelebrate,
 }) => {
   const [copied, setCopied] = useState(false);
 
   const isAllCompleted =
     plan.milestones.length > 0 &&
     plan.milestones.every((m) => m.status === 'completed');
+
+  const completedCount = plan.milestones.filter((m) => m.status === 'completed').length;
 
   const handleCopyMarkdown = () => {
     const text = exportPlanAsMarkdown(plan);
@@ -51,23 +55,43 @@ export const PlanHeader: React.FC<PlanHeaderProps> = ({
     buffer_first: '🛡️ 安全バッファ重視型',
   };
 
+  const categoryLabels: Record<string, string> = {
+    study: '📚 勉強・資格',
+    project: '💻 制作・開発',
+    habit: '🏃 習慣・健康',
+    life: '🧹 生活・片付け',
+    general: '🎯 汎用目標',
+  };
+
   return (
     <div className="space-y-4">
       {/* Celebration Banner if finished */}
       {isAllCompleted && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md animate-fadeIn flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-            <Trophy className="w-7 h-7 text-amber-100 animate-bounce" />
+        <div
+          onClick={onCelebrate}
+          className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md animate-fadeIn flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer hover:shadow-lg transition"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+              <Trophy className="w-7 h-7 text-amber-100 animate-bounce" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
+                <span>🎉 全ての中間チェックポイントを達成しました！</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-amber-100 mt-0.5 leading-relaxed">
+                {plan.celebrationMessage ||
+                  `「${plan.title}」を${plan.totalDays}日間のペース配分で見事に完走しました！`}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-bold">
-              🎉 全ての中間チェックポイントを達成しました！
-            </h3>
-            <p className="text-xs sm:text-sm text-amber-100 mt-0.5 leading-relaxed">
-              {plan.celebrationMessage ||
-                `「${plan.title}」を${plan.totalDays}日間のペース配分で見事に完走しました！`}
-            </p>
-          </div>
+          <button
+            type="button"
+            className="self-end sm:self-center px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>褒め言葉を見る</span>
+          </button>
         </div>
       )}
 
@@ -79,6 +103,11 @@ export const PlanHeader: React.FC<PlanHeaderProps> = ({
               <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
                 {plan.totalDays}日間プラン
               </span>
+              {plan.category && (
+                <span className="text-xs font-bold text-stone-700 bg-stone-100 px-2.5 py-0.5 rounded-full border border-stone-200/80">
+                  {categoryLabels[plan.category] || plan.category}
+                </span>
+              )}
               <span className="text-xs font-medium text-stone-600 bg-stone-100 px-2.5 py-0.5 rounded-full">
                 {pacingLabels[plan.pacingStyle] || 'ペース配分'}
               </span>
@@ -98,6 +127,18 @@ export const PlanHeader: React.FC<PlanHeaderProps> = ({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
+            {completedCount > 0 && onCelebrate && (
+              <button
+                type="button"
+                onClick={onCelebrate}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 transition cursor-pointer shadow-2xs"
+                title="進捗を褒めてもらう・達成メッセージを確認する"
+              >
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <span>褒め言葉を見る</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onAddMilestone}
@@ -129,10 +170,11 @@ export const PlanHeader: React.FC<PlanHeaderProps> = ({
             <button
               type="button"
               onClick={onDeletePlan}
-              className="p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-stone-500 hover:text-rose-600 bg-stone-50 hover:bg-rose-50 border border-stone-200 hover:border-rose-200 transition cursor-pointer"
               title="この目標計画を削除"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>削除</span>
             </button>
           </div>
         </div>

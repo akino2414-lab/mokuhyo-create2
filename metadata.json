@@ -1,0 +1,8 @@
+{
+  "name": "中間目標プランナー",
+  "description": "「◯日でここまでやりたい」という漠然とした目標から、適切な中間チェックポイントと進捗の目安を自動設計・管理できるアプリ",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
